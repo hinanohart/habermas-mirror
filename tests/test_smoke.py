@@ -17,7 +17,9 @@ def client(tmp_path, monkeypatch):
 
     importlib.reload(db_mod)
     importlib.reload(main_mod)
-    return TestClient(main_mod.create_app())
+    # `with TestClient(...)` triggers the FastAPI lifespan so init_db runs.
+    with TestClient(main_mod.create_app()) as c:
+        yield c
 
 
 def test_healthz_ok(client):

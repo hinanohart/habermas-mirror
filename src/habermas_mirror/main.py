@@ -2,11 +2,20 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 from habermas_mirror import __version__
-from habermas_mirror.api import opinions
+from habermas_mirror.api import facilitate, opinions
 from habermas_mirror.db import init_db
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    init_db()
+    yield
 
 
 def create_app() -> FastAPI:
@@ -17,9 +26,10 @@ def create_app() -> FastAPI:
             "Self-hostable reference re-implementation of the prompted "
             "Habermas Machine deliberation facilitator pipeline."
         ),
+        lifespan=lifespan,
     )
-    init_db()
     app.include_router(opinions.router, prefix="/api", tags=["sessions"])
+    app.include_router(facilitate.router, prefix="/api", tags=["facilitate"])
 
     @app.get("/healthz", tags=["meta"])
     def healthz() -> dict[str, str]:
