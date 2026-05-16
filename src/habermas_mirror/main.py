@@ -7,7 +7,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -52,6 +52,18 @@ def create_app() -> FastAPI:
     @app.get("/healthz", tags=["meta"])
     def healthz() -> dict[str, str]:
         return {"status": "ok", "version": __version__}
+
+    # Catch-all for unknown /api/* paths. Without this, the StaticFiles
+    # mount at "/" below would happily serve index.html (HTTP 200) for
+    # mistyped API paths, which silently breaks client error handling.
+    # Registered AFTER the real routers so it only fires on misses.
+    @app.api_route(
+        "/api/{rest:path}",
+        methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        include_in_schema=False,
+    )
+    def api_not_found(rest: str) -> None:
+        raise HTTPException(status_code=404, detail=f"unknown API endpoint: /api/{rest}")
 
     dist = _locate_web_dist()
     if dist is not None:

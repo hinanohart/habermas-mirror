@@ -30,6 +30,7 @@ class StatementOut(BaseModel):
     stage: str
     body: str
     provider: str
+    run_id: str
     created_at: datetime
 
 

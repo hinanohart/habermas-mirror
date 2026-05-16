@@ -82,6 +82,22 @@ def test_opinion_validation(client):
     assert r.status_code == 422
 
 
+def test_unknown_api_path_returns_json_404(client):
+    """Mistyped /api/* paths must return JSON 404, not the SPA index.html.
+
+    With ``StaticFiles(html=True)`` mounted at ``/``, an unmatched API
+    path used to fall through to the SPA and reply 200 with the React
+    bundle, breaking client-side error handling. A dedicated /api
+    catch-all now returns a JSON 404 before the static mount has a
+    chance to intercept.
+    """
+    r = client.get("/api/does-not-exist")
+    assert r.status_code == 404
+    assert r.headers.get("content-type", "").startswith("application/json")
+    body = r.json()
+    assert "unknown API endpoint" in body.get("detail", "")
+
+
 def test_serves_built_web_bundle_when_present(client):
     """If web/dist exists, the root path serves the bundled React UI.
 

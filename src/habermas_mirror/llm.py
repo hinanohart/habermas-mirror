@@ -75,8 +75,31 @@ def complete(
         temperature=temperature,
         max_tokens=max_tokens,
     )
-    text = resp["choices"][0]["message"]["content"]
+    text = _extract_text(resp)
     return LLMResponse(text=text, provider=f"litellm:{chosen}")
+
+
+def _extract_text(resp: object) -> str:
+    """Extract the assistant content from a LiteLLM completion response.
+
+    LiteLLM exposes its ``ModelResponse`` with both attribute access
+    (``resp.choices[0].message.content``) and dict-like ``__getitem__``.
+    Older provider shims and some test stubs return plain dicts; newer
+    LiteLLM versions return Pydantic models where attribute access is
+    the canonical path. Try attribute access first and fall back to
+    subscripting so we work against both shapes without depending on
+    the exact LiteLLM version pinned in the venv.
+    """
+    try:
+        choice = resp.choices[0]  # type: ignore[attr-defined]
+        message = choice.message
+        content = message.content
+        if content is None:
+            raise AttributeError
+        return str(content)
+    except (AttributeError, IndexError, TypeError):
+        pass
+    return str(resp["choices"][0]["message"]["content"])  # type: ignore[index]
 
 
 def _mock_completion(prompt: str) -> str:

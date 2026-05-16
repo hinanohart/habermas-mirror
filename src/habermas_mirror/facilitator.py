@@ -6,8 +6,12 @@ Pipeline (matching the prompted reference in Tessler et al., Science 2024):
 
 The "gather" step is implicit: it reads the opinions that participants
 have already submitted via the API. The remaining three stages each
-call the LLM once and persist their output to the ``statements`` table
-so the full transcript is available for inspection and audit.
+call the LLM once. All three persistence writes happen in a single
+transaction at the very end, tagged with a shared ``run_id`` (uuid4)
+so the three rows can be correlated, ordered, and rolled back together.
+If any LLM call fails mid-pipeline, nothing is written; the alternative
+(per-stage autocommit) used to leave orphan ``draft`` rows behind when
+``critique`` or ``refine`` raised.
 
 This is a single-provider implementation: by default all three LLM
 calls go to the same model. The structural implications of that choice
@@ -18,11 +22,13 @@ a consensus mechanism.
 
 from __future__ import annotations
 
+import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
+from uuid import uuid4
 
 from habermas_mirror.db import get_conn
-from habermas_mirror.llm import complete
+from habermas_mirror.llm import LLMResponse, complete
 from habermas_mirror.models import StatementOut
 
 STAGES = ("draft", "critique", "refine")
@@ -71,23 +77,35 @@ def _format_opinions(opinions: list[tuple[str, str]]) -> str:
     )
 
 
-def _record(session_id: str, stage: str, body: str, provider: str) -> StatementOut:
-    now = _now_iso()
-    with get_conn() as conn:
-        cur = conn.execute(
-            "INSERT INTO statements "
-            "(session_id, stage, body, provider, created_at) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (session_id, stage, body, provider, now),
-        )
-        sid_row = cur.lastrowid
+def _insert_statement(
+    conn: sqlite3.Connection,
+    *,
+    session_id: str,
+    stage: str,
+    response: LLMResponse,
+    run_id: str,
+    now_iso: str,
+) -> StatementOut:
+    cur = conn.execute(
+        "INSERT INTO statements "
+        "(session_id, stage, body, provider, run_id, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (session_id, stage, response.text, response.provider, run_id, now_iso),
+    )
+    oid = cur.lastrowid
+    if oid is None:
+        # sqlite3 is documented to return an int after a single-row INSERT;
+        # the None branch is a driver-inconsistency guard rather than a
+        # path we expect to hit.
+        raise RuntimeError("sqlite INSERT did not return a lastrowid")
     return StatementOut(
-        id=sid_row,
+        id=oid,
         session_id=session_id,
         stage=stage,
-        body=body,
-        provider=provider,
-        created_at=datetime.fromisoformat(now),
+        body=response.text,
+        provider=response.provider,
+        run_id=run_id,
+        created_at=datetime.fromisoformat(now_iso),
     )
 
 
@@ -98,6 +116,12 @@ def facilitate(session_id: str) -> list[StatementOut]:
     are zero opinions, ``ValueError`` is raised. If the session itself
     is unknown, ``LookupError`` is raised.
 
+    All three LLM calls are made BEFORE any DB write so that a slow or
+    failing LLM does not hold a SQLite write lock for the duration. The
+    three resulting rows are then inserted in a single transaction with
+    a shared ``run_id`` so partial-failure half-runs cannot leak into
+    the ``statements`` table.
+
     Returns the three persisted statements in order.
     """
     topic, opinions = _gather_opinions(session_id)
@@ -105,17 +129,13 @@ def facilitate(session_id: str) -> list[StatementOut]:
         raise ValueError("cannot facilitate a session with no opinions")
     opinions_block = _format_opinions(opinions)
 
-    results: list[StatementOut] = []
-
     draft_prompt = _load_prompt("draft").format(topic=topic, opinions=opinions_block)
     draft = complete(draft_prompt)
-    results.append(_record(session_id, "draft", draft.text, draft.provider))
 
     critique_prompt = _load_prompt("critique").format(
         topic=topic, opinions=opinions_block, draft=draft.text
     )
     critique = complete(critique_prompt)
-    results.append(_record(session_id, "critique", critique.text, critique.provider))
 
     refine_prompt = _load_prompt("refine").format(
         topic=topic,
@@ -124,6 +144,19 @@ def facilitate(session_id: str) -> list[StatementOut]:
         critique=critique.text,
     )
     refine = complete(refine_prompt)
-    results.append(_record(session_id, "refine", refine.text, refine.provider))
 
-    return results
+    run_id = uuid4().hex
+    now = _now_iso()
+    stages = (("draft", draft), ("critique", critique), ("refine", refine))
+    with get_conn() as conn:
+        return [
+            _insert_statement(
+                conn,
+                session_id=session_id,
+                stage=stage,
+                response=response,
+                run_id=run_id,
+                now_iso=now,
+            )
+            for stage, response in stages
+        ]

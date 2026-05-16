@@ -56,6 +56,8 @@ def submit_opinion(session_id: str, payload: OpinionIn) -> OpinionOut:
             (session_id, payload.author, payload.body, now),
         )
         oid = cur.lastrowid
+        if oid is None:
+            raise RuntimeError("sqlite INSERT did not return a lastrowid")
     return OpinionOut(
         id=oid,
         session_id=session_id,
@@ -80,7 +82,7 @@ def get_session(session_id: str) -> SessionOut:
             (session_id,),
         ).fetchall()
         statement_rows = conn.execute(
-            "SELECT id, session_id, stage, body, provider, created_at "
+            "SELECT id, session_id, stage, body, provider, run_id, created_at "
             "FROM statements WHERE session_id = ? ORDER BY id",
             (session_id,),
         ).fetchall()
@@ -102,6 +104,7 @@ def get_session(session_id: str) -> SessionOut:
             stage=r["stage"],
             body=r["body"],
             provider=r["provider"],
+            run_id=r["run_id"],
             created_at=datetime.fromisoformat(r["created_at"]),
         )
         for r in statement_rows

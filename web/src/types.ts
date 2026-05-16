@@ -12,6 +12,7 @@ export interface StatementOut {
   stage: string;
   body: string;
   provider: string;
+  run_id: string;
   created_at: string;
 }
 

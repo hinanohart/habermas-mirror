@@ -99,6 +99,75 @@ def test_facilitate_returns_three_stages_in_order(client):
     # ids strictly increasing
     ids = [s["id"] for s in stages]
     assert ids == sorted(ids)
+    # All three stages share a single run_id (uuid4 hex).
+    run_ids = {s["run_id"] for s in stages}
+    assert len(run_ids) == 1
+    assert len(next(iter(run_ids))) == 32
+
+
+def test_facilitate_is_atomic_on_llm_failure(client, monkeypatch):
+    """If any stage's LLM call raises, no statements row should land.
+
+    Prior behaviour committed each stage separately; a failure of stage 2
+    or 3 left orphan stage-1 rows in the DB. With all three INSERTs in
+    one transaction, partial failure leaves the statements table empty.
+    """
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-fake")
+    monkeypatch.setenv("HABERMAS_MIRROR_MODEL", "openai/gpt-4o-mini")
+    import litellm
+
+    calls = {"n": 0}
+
+    def fake_completion(**kwargs):
+        calls["n"] += 1
+        if calls["n"] == 2:  # explode on the critique stage
+            raise RuntimeError("simulated provider failure")
+        return {"choices": [{"message": {"content": f"ok-{calls['n']}"}}]}
+
+    monkeypatch.setattr(litellm, "completion", fake_completion)
+
+    sid = _seed(client)
+    # TestClient re-raises unhandled server exceptions by default; what
+    # matters for atomicity is the post-condition on the database, not
+    # the HTTP wire-level shape (which is a separate concern handled by
+    # production deployments via FastAPI's default 500 envelope).
+    with pytest.raises(RuntimeError, match="simulated provider failure"):
+        client.post(f"/api/sessions/{sid}/facilitate")
+
+    # Cross-check via the read endpoint: the session must still have its
+    # opinions but exactly zero statements (atomic rollback).
+    r = client.get(f"/api/sessions/{sid}")
+    body = r.json()
+    assert len(body["opinions"]) == 3
+    assert body["statements"] == []
+
+
+def test_facilitate_handles_litellm_attribute_shape(client, monkeypatch):
+    """Real LiteLLM returns objects with attribute access, not bare dicts.
+
+    A test stub that returns a plain dict happens to work because
+    ``ModelResponse`` supports ``__getitem__`` too, but the canonical
+    path (and the one newer LiteLLM versions prefer) is attribute access:
+    ``resp.choices[0].message.content``. This test pins both shapes work.
+    """
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-fake")
+    monkeypatch.setenv("HABERMAS_MIRROR_MODEL", "openai/gpt-4o-mini")
+    from types import SimpleNamespace
+
+    import litellm
+
+    def fake_completion(**kwargs):
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="from attribute shape"))]
+        )
+
+    monkeypatch.setattr(litellm, "completion", fake_completion)
+
+    sid = _seed(client)
+    r = client.post(f"/api/sessions/{sid}/facilitate")
+    assert r.status_code == 201, r.text
+    bodies = [s["body"] for s in r.json()["stages"]]
+    assert bodies == ["from attribute shape"] * 3
 
 
 def test_facilitate_persists_statements(client):
