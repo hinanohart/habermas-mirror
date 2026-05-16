@@ -91,9 +91,52 @@ def test_llm_mock_when_no_key(monkeypatch):
         "AZURE_API_KEY",
     ):
         monkeypatch.delenv(k, raising=False)
+    monkeypatch.delenv("HABERMAS_MIRROR_MODEL", raising=False)
     from habermas_mirror.llm import complete
 
     resp = complete("hello world\nsecond line")
     assert resp.provider == "mock"
     assert "[MOCK]" in resp.text
-    assert "hello world" in resp.text
+    # mock must NOT echo prompt content (PII / secret leakage prevention)
+    assert "hello world" not in resp.text
+    assert "second line" not in resp.text
+    # determinism: same prompt → same response
+    resp2 = complete("hello world\nsecond line")
+    assert resp.text == resp2.text
+    # different prompt → different fingerprint
+    resp3 = complete("different prompt")
+    assert resp3.text != resp.text
+
+
+def test_llm_mock_when_model_unset(monkeypatch):
+    # provider key is present, but no model chosen → must still mock
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-do-not-use-mock-anyway")
+    monkeypatch.delenv("HABERMAS_MIRROR_MODEL", raising=False)
+    from habermas_mirror.llm import complete
+
+    resp = complete("any prompt")
+    assert resp.provider == "mock"
+
+
+def test_llm_uses_litellm_when_configured(monkeypatch):
+    """Real LiteLLM codepath is reached when both model + key are set.
+
+    We patch `litellm.completion` so the test never makes a network call and
+    never depends on a real API key being valid — but we do exercise the
+    branch in `complete()` that calls it.
+    """
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-fake-for-test")
+    monkeypatch.setenv("HABERMAS_MIRROR_MODEL", "openai/gpt-4o-mini")
+
+    import litellm
+
+    def fake_completion(**kwargs):
+        return {"choices": [{"message": {"content": "stubbed reply"}}]}
+
+    monkeypatch.setattr(litellm, "completion", fake_completion)
+
+    from habermas_mirror.llm import complete
+
+    resp = complete("anything")
+    assert resp.provider == "litellm:openai/gpt-4o-mini"
+    assert resp.text == "stubbed reply"

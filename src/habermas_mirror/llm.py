@@ -1,20 +1,33 @@
 """LLM provider abstraction.
 
-Uses LiteLLM when an upstream provider API key is present in the process
-environment; otherwise returns a deterministic mock string so that the API
-and pipeline are fully runnable for development and tests without any secret
-being handled by this code.
+Uses LiteLLM when the caller has explicitly chosen a model (via the
+`HABERMAS_MIRROR_MODEL` environment variable or the `model=` argument) AND a
+matching provider key is present in the environment. Otherwise returns a
+deterministic mock so the API and pipeline are fully runnable for development
+and tests without any secret being handled by this code.
 
-No provider key is ever read into a Python variable for transport — LiteLLM
-reads provider keys directly from the environment.
+There is intentionally no built-in default model: picking one would
+preferentially promote one vendor over others, undermining the project's
+provider-agnostic stance. Set `HABERMAS_MIRROR_MODEL` (e.g. `openai/gpt-4o-mini`,
+`anthropic/claude-3-5-sonnet`, `gemini/gemini-1.5-pro`, ...) to enable real
+completions.
+
+No provider key value is ever read into a Python variable for transport —
+LiteLLM reads provider keys directly from the environment.
 """
 
 from __future__ import annotations
 
+import hashlib
 import os
 from dataclasses import dataclass
 
-DEFAULT_MODEL = os.environ.get("HABERMAS_MIRROR_MODEL", "openai/gpt-4o-mini")
+
+def _configured_model() -> str | None:
+    """Return the operator-chosen model, or None if unset/blank."""
+    val = os.environ.get("HABERMAS_MIRROR_MODEL", "").strip()
+    return val or None
+
 
 _PROVIDER_KEY_ENV_VARS = (
     "OPENAI_API_KEY",
@@ -44,13 +57,18 @@ def complete(
     temperature: float = 0.7,
     max_tokens: int = 1024,
 ) -> LLMResponse:
-    """Single-turn completion. Falls back to mock if no provider key is set."""
-    if not _any_provider_key_set():
+    """Single-turn completion.
+
+    Falls back to the deterministic mock when either (a) no model has been
+    explicitly chosen, or (b) no provider key is present. Never picks a
+    default model on the caller's behalf.
+    """
+    chosen = model or _configured_model()
+    if not chosen or not _any_provider_key_set():
         return LLMResponse(text=_mock_completion(prompt), provider="mock")
 
-    import litellm  # imported lazily so test envs without litellm still work
+    import litellm  # lazy import so test envs without litellm still work
 
-    chosen = model or DEFAULT_MODEL
     resp = litellm.completion(
         model=chosen,
         messages=[{"role": "user", "content": prompt}],
@@ -62,10 +80,17 @@ def complete(
 
 
 def _mock_completion(prompt: str) -> str:
-    head = prompt.strip().splitlines()[0][:100] if prompt.strip() else ""
+    """Deterministic placeholder.
+
+    Returns a non-leaky string. We attach a short SHA-256 fingerprint of the
+    prompt so tests can assert determinism (same prompt → same response)
+    without ever echoing user-supplied content back into the response body
+    or — via the API layer — into the SQLite ``statements`` table.
+    """
+    fp = hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:12]
     return (
-        "[MOCK] No LLM provider API key detected in the environment "
-        "(set OPENAI_API_KEY / ANTHROPIC_API_KEY / etc. to enable real "
-        "completions via LiteLLM). "
-        f'Prompt opener: "{head}"'
+        "[MOCK] No LLM provider configured. Set HABERMAS_MIRROR_MODEL (for "
+        "example openai/gpt-4o-mini, anthropic/claude-3-5-sonnet, "
+        "gemini/gemini-1.5-pro) and the matching provider API key to enable "
+        f"real completions via LiteLLM. (prompt-fingerprint sha256:{fp})"
     )

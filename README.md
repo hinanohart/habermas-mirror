@@ -55,8 +55,8 @@ gratefully cite their published work and the [open prompted reference][hm-deepmi
 
 | Phase | Scope | Status |
 |------:|-------|--------|
-| 0 | repo skeleton, license, README | **in progress** |
-| 1 | FastAPI app, LiteLLM wrapper, SQLite, opinion endpoint | planned |
+| 0 | repo skeleton, license, README | done |
+| 1 | FastAPI app, LiteLLM wrapper, SQLite, opinion endpoint | done |
 | 2 | four-stage facilitator pipeline + prompts | planned |
 | 3 | minimal React (Vite) UI | planned |
 | 4 | docs, smoke tests, release artifact | planned |
