@@ -85,9 +85,13 @@ PRs for, in priority order:
   contribute a small `SecureHeaders` middleware.
 - **Accessibility.** The Vite UI uses `placeholder`-only inputs for
   author and opinion body; explicit `<label>` association is welcome.
-- **Idempotency / rate-limit on `POST /api/sessions/{id}/facilitate`.**
+- **Rate-limit / idempotency on `POST /api/sessions/{id}/facilitate`.**
   Each call fires three LLM requests; the endpoint does not currently
-  short-circuit duplicate calls or enforce a per-session cap.
+  short-circuit duplicate calls or enforce a per-session cap. The
+  `statements.run_id` column added in the post-audit pass is the
+  primitive an idempotency implementation should key on (e.g. accept a
+  client-supplied `Idempotency-Key` header and persist it alongside
+  `run_id`).
 - **Threadpool saturation on facilitate.** The facilitate route is a
   synchronous `def` that issues three sequential `litellm.completion`
   calls — typical wall time 6–45s — so it occupies one FastAPI

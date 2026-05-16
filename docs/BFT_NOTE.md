@@ -52,3 +52,23 @@ deliberately scoped out of the reference implementation, because the
 existing literature in 2026 already covers most of them better.
 
 See the README for the rest of the non-goals.
+
+## On the dissent-preservation scope cut
+
+For the record: the first-session exploration explicitly listed
+"dissent preservation + reject-consensus right, **first-class in MVP**"
+as the mitigation for the *manipulative-consensus* risk Volpe (2025)
+raises against the original Habermas Machine. When the scope was
+narrowed to A' — a self-hostable engineering re-implementation of the
+prompted pipeline, with no academic novelty claim — that mitigation
+was demoted from "must-have" to "non-goal" without a separate
+discussion. A later audit flagged this as a silent drift relative to
+the original exploration memo.
+
+This document is the audit-trail record of that demotion. The acceptable
+operator-level mitigation today is the same as for single-provider
+operation more generally: run the pipeline more than once with
+heterogeneous models, treat the resulting group statement as one input
+among others, and preserve the underlying opinions (which are not
+discarded by this pipeline) so any later dissent-focused tool can be
+attached on top.

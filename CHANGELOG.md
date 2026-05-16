@@ -77,6 +77,39 @@ shipped yet.
   that pin the README roadmap, `docs/BFT_NOTE.md` link, the DeepMind
   non-affiliation disclaimer, and the sunset clause.
 
+### Post-audit hardening (single commit `8dd5bf9`)
+
+Three sub-agents (architect, code-reviewer, critic) plus an
+independent critic round audited the full 10-commit chain after the
+release-prep work was done. Five real defects surfaced and were
+closed in `fix(audit)`:
+
+- `facilitator.facilitate()` is now atomic. The three LLM calls happen
+  before any DB write; all three INSERTs land in one transaction
+  tagged with a shared uuid4 `run_id`. Partial-failure cases (a stage
+  2 or 3 raise) no longer leave orphan stage-1 rows in `statements`.
+  The new `run_id` column is also the primitive future idempotency
+  work will build on.
+- `cur.lastrowid` is now fail-fast in `facilitator` and `opinions` —
+  the stdlib types it as `int | None`, so an unexpected None used to
+  surface as an opaque Pydantic ValidationError at response time
+  rather than as the driver-inconsistency error it actually is.
+- `/api/{rest:path}` JSON 404 catch-all blocks mistyped API paths
+  from falling through to the SPA bundle and replying 200.
+- SQLite pragmas widened: `journal_mode=WAL` and `busy_timeout=5000`
+  in `_apply_pragmas`. Two concurrent writers no longer immediately
+  crash the second one with `database is locked`.
+- `llm._extract_text()` accepts both LiteLLM's canonical
+  attribute-shape (`resp.choices[0].message.content` on
+  `ModelResponse`) and the dict-shape that test stubs and older
+  shims return.
+
+Tests added: `test_facilitate_returns_three_stages_in_order` now
+pins the shared `run_id`; `test_facilitate_is_atomic_on_llm_failure`
+asserts the rollback contract; `test_facilitate_handles_litellm_attribute_shape`
+pins the attribute path; `test_unknown_api_path_returns_json_404`
+pins the catch-all. 26/26 pytest pass.
+
 ### Phase 4 — docs, smoke, release artefact
 
 - README Usage section with explicit two-shell setup (uvicorn +

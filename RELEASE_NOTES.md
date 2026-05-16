@@ -32,10 +32,12 @@ the typical "submit-opinions-then-facilitate" loop.
   mounts it as a static directory so the same process answers both
   `/api/*` and `/`. Otherwise the API serves alone and the frontend can
   be deployed behind any static host.
-- 22 tests (`pytest`) covering API plumbing, the four-stage pipeline
-  with both mock and patched-LiteLLM paths, CORS, the static-mount glue
-  when the bundle is present, and four release-invariant guards on the
-  README.
+- 26 tests (`pytest`) covering API plumbing, the four-stage pipeline
+  with both mock and patched-LiteLLM paths (attribute and dict shape),
+  pipeline atomicity (no orphan stage-1 rows on stage-2 failure), the
+  shared `run_id` correlation column, CORS, the static-mount glue when
+  the bundle is present, the `/api/{rest:path}` JSON 404 catch-all,
+  and five release-invariant guards on the README and `pyproject.toml`.
 
 ## What this is **not**
 
