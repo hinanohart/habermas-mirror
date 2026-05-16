@@ -23,7 +23,7 @@ You need Python 3.12+, Node 20+, and `git`.
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-pytest                       # full suite — should be 22 green
+pytest                       # full suite — should be all green
 habermas-mirror serve        # uvicorn on http://127.0.0.1:8000
 
 # In a second shell — Vite dev server
@@ -88,6 +88,14 @@ PRs for, in priority order:
 - **Idempotency / rate-limit on `POST /api/sessions/{id}/facilitate`.**
   Each call fires three LLM requests; the endpoint does not currently
   short-circuit duplicate calls or enforce a per-session cap.
+- **Threadpool saturation on facilitate.** The facilitate route is a
+  synchronous `def` that issues three sequential `litellm.completion`
+  calls — typical wall time 6–45s — so it occupies one FastAPI
+  threadpool worker for the duration. With the default pool (40
+  workers), about thirteen concurrent facilitate calls will saturate
+  it. The right fix is `async def` plus `litellm.acompletion`. For
+  0.0.1 the project is labelled Alpha and assumes a single-operator
+  self-host where this rarely bites; do not assume more.
 
 ## What we explicitly will not accept
 
