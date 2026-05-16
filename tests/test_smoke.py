@@ -82,6 +82,27 @@ def test_opinion_validation(client):
     assert r.status_code == 422
 
 
+def test_serves_built_web_bundle_when_present(client):
+    """If web/dist exists, the root path serves the bundled React UI.
+
+    Skipped when the bundle has not been built — the API still works
+    standalone, and this test only verifies the static-mount glue.
+    """
+    from pathlib import Path
+
+    repo = Path(__file__).resolve().parents[1]
+    dist_index = repo / "web" / "dist" / "index.html"
+    if not dist_index.is_file():
+        import pytest
+
+        pytest.skip("web/dist not built; run `cd web && npm run build`")
+    r = client.get("/")
+    assert r.status_code == 200
+    body = r.text.lower()
+    assert "habermas-mirror" in body
+    assert '<div id="root"' in body
+
+
 def test_cors_dev_origin_allowed(client):
     """Vite dev server (localhost:5173) must be a CORS-allowed origin."""
     r = client.options(

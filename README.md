@@ -64,6 +64,48 @@ the honest version.
 
 [Apache License 2.0](./LICENSE). See `LICENSE` for the full text.
 
+## Usage
+
+You need Python 3.12+ and Node 20+.
+
+```bash
+# 1. Install the backend in an editable virtual environment.
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+
+# 2. Run the FastAPI app. With no provider configuration, every
+#    facilitator call returns deterministic `[MOCK]` placeholders so you
+#    can exercise the UI without spending tokens or wiring up a key.
+habermas-mirror serve            # uvicorn on http://127.0.0.1:8000
+
+# 3. (Optional) Build and serve the React UI. The FastAPI app mounts
+#    web/dist as static when present, so you can run a single process:
+cd web && npm install && npm run build && cd ..
+habermas-mirror serve            # now /api/* AND / both work
+
+# 4. (Dev only) Run Vite in watch mode in a second shell. The dev
+#    server proxies /api to the backend and skips CORS entirely.
+cd web && npm run dev            # http://localhost:5173
+```
+
+### Pointing the pipeline at a real LLM provider
+
+Set `HABERMAS_MIRROR_MODEL` and the matching provider key in the
+environment of the server process. LiteLLM reads provider keys
+directly from `os.environ`; no key value is ever held by this
+application's Python code.
+
+```bash
+export HABERMAS_MIRROR_MODEL=openai/gpt-4o-mini
+export OPENAI_API_KEY=...
+habermas-mirror serve
+```
+
+Other providers work the same way — `anthropic/claude-3-5-sonnet` with
+`ANTHROPIC_API_KEY`, `gemini/gemini-1.5-pro` with `GEMINI_API_KEY`, and
+so on (see the [LiteLLM provider list](https://docs.litellm.ai/docs/providers)).
+
 ## Roadmap (high level)
 
 | Phase | Scope | Status |
