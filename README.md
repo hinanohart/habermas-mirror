@@ -71,7 +71,7 @@ the honest version.
 | 0 | repo skeleton, license, README | done |
 | 1 | FastAPI app, LiteLLM wrapper, SQLite, opinion endpoint | done |
 | 2 | four-stage facilitator pipeline + prompts | done |
-| 3 | minimal React (Vite) UI | planned |
+| 3 | minimal React (Vite) UI | done |
 | 4 | docs, smoke tests, release artifact | planned |
 
 > **Sunset condition.** `habermas-mirror` is an exploratory engineering
