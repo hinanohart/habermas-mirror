@@ -1,0 +1,24 @@
+habermas-mirror
+Copyright 2026 habermas-mirror contributors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+------------------------------------------------------------------------
+Acknowledgment of upstream work
+------------------------------------------------------------------------
+
+habermas-mirror is a clean-room, prompted-only re-implementation of the
+deliberation facilitator described in:
+
+    Tessler, M. H., Bakker, M., Jarrett, D., et al.
+    "AI can help humans find common ground in democratic deliberation."
+    Science, 2024. doi:10.1126/science.adq2852
+
+DeepMind's prompted reference implementation is published at
+    https://github.com/google-deepmind/habermas_machine
+and that repository is its own work under its own license.
+
+habermas-mirror is NOT affiliated with, endorsed by, or sponsored by
+Google DeepMind, Alphabet, or the authors of the Science paper. The
+fine-tuned reward model from the Science paper is not redistributed
+here and is not derivable from this project.
