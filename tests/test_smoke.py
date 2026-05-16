@@ -82,6 +82,35 @@ def test_opinion_validation(client):
     assert r.status_code == 422
 
 
+def test_cors_dev_origin_allowed(client):
+    """Vite dev server (localhost:5173) must be a CORS-allowed origin."""
+    r = client.options(
+        "/api/sessions",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "Content-Type",
+        },
+    )
+    assert r.status_code == 200
+    assert r.headers.get("access-control-allow-origin") == "http://localhost:5173"
+
+
+def test_cors_foreign_origin_not_reflected(client):
+    """A random foreign origin must not be reflected as allowed."""
+    r = client.options(
+        "/api/sessions",
+        headers={
+            "Origin": "https://evil.example.com",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "Content-Type",
+        },
+    )
+    # FastAPI/Starlette returns 400 for disallowed origin preflight,
+    # and never echoes the origin back.
+    assert r.headers.get("access-control-allow-origin") != "https://evil.example.com"
+
+
 def test_llm_mock_when_no_key(monkeypatch):
     for k in (
         "OPENAI_API_KEY",
