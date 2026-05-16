@@ -72,6 +72,23 @@ content into the response.
 - Lockfile (`web/package-lock.json`) changes should go in a dedicated
   commit so review attention can focus on actual code changes.
 
+## Known gaps before 0.1.0
+
+These are known limitations of the 0.0.1 release that we will accept
+PRs for, in priority order:
+
+- **Security response headers on the static-mount path.** When the
+  backend serves `web/dist` as `StaticFiles`, it does not add
+  `X-Content-Type-Options`, `X-Frame-Options`, or a Content-Security-
+  Policy header. Self-hosters exposing the app to anyone they didn't
+  personally pick should put it behind a reverse proxy that does, or
+  contribute a small `SecureHeaders` middleware.
+- **Accessibility.** The Vite UI uses `placeholder`-only inputs for
+  author and opinion body; explicit `<label>` association is welcome.
+- **Idempotency / rate-limit on `POST /api/sessions/{id}/facilitate`.**
+  Each call fires three LLM requests; the endpoint does not currently
+  short-circuit duplicate calls or enforce a per-session cap.
+
 ## What we explicitly will not accept
 
 - Code or docs claiming `habermas-mirror` implements Habermasian

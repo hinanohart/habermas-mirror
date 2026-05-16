@@ -5,8 +5,11 @@ facilitator pipeline described in **Tessler et al., *AI can help humans find
 common ground in democratic deliberation*, Science (2024)** — the so-called
 "Habermas Machine".
 
-> **Status: pre-alpha (Phase 0 / repo skeleton).** The pipeline, API, and UI
-> land over the next phases. Nothing here is production-ready.
+> **Status: pre-alpha (0.0.1 release draft).** The four roadmap phases
+> are committed: backend pipeline, four-stage facilitator, React UI,
+> and release artefacts. The repository has not yet been published to
+> GitHub. Nothing here is production-ready — see the *Security model*
+> section before exposing it to anyone you didn't pick.
 
 ## Why this exists
 
@@ -114,7 +117,7 @@ so on (see the [LiteLLM provider list](https://docs.litellm.ai/docs/providers)).
 | 1 | FastAPI app, LiteLLM wrapper, SQLite, opinion endpoint | done |
 | 2 | four-stage facilitator pipeline + prompts | done |
 | 3 | minimal React (Vite) UI | done |
-| 4 | docs, smoke tests, release artifact | planned |
+| 4 | docs, smoke tests, release artifact | done |
 
 > **Sunset condition.** `habermas-mirror` is an exploratory engineering
 > artifact. If, six months after the first tagged release, the project

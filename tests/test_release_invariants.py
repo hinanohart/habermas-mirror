@@ -57,19 +57,36 @@ def test_readme_roadmap_marks_completed_phases_done():
 
     # A phase whose commit history references it must not still be 'planned'.
     # 'in progress' is acceptable transiently; 'planned' is the failure case.
+    # Threshold: a single feat/chore commit and its monitor-fix follow-up
+    # together count as ≥2 references, so by the time a phase ships we
+    # require its roadmap row to read `done`.
     stale = [
         (phase, statuses[phase])
         for phase, n in commit_counts.items()
         if phase in statuses and statuses[phase] == "planned" and n >= 2
-        # n >= 2 lets Phase N appear as the *target* of a single commit
-        # before its README row needs to flip. By the time a fix-up
-        # commit for the same phase lands, the row must say `done`.
     ]
     assert not stale, (
         f"README roadmap claims these phases are still 'planned' even though "
         f"two or more commits already reference them: {stale}. "
         "Flip the roadmap row(s) to 'done' before merging."
     )
+
+
+def test_pyproject_is_valid_toml_and_lists_urls():
+    """Catch the kind of pyproject mistake that hides under `pip install`."""
+    import tomllib
+
+    with open(REPO_ROOT / "pyproject.toml", "rb") as f:
+        data = tomllib.load(f)
+    project = data["project"]
+    assert project["name"] == "habermas-mirror"
+    assert project["requires-python"].startswith(">=3.")
+    urls = project.get("urls") or {}
+    assert "Source" in urls, "pyproject.toml [project.urls] must declare Source"
+    assert "Changelog" in urls, "pyproject.toml [project.urls] must declare Changelog"
+    assert isinstance(project.get("dependencies"), list)
+    assert any("fastapi" in dep for dep in project["dependencies"])
+    assert any("litellm" in dep for dep in project["dependencies"])
 
 
 def test_readme_links_to_bft_note():
