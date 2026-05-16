@@ -113,6 +113,61 @@ def test_facilitate_persists_statements(client):
     assert len(body["opinions"]) == 3
 
 
+def test_facilitate_user_curly_braces_appear_verbatim(client, monkeypatch):
+    """User content containing ``{...}`` must appear verbatim and not crash.
+
+    ``str.format`` only parses placeholders in the template — substituted
+    values are inserted literally and not re-parsed. So a participant who
+    submits an opinion containing ``{draft}``, ``{topic}``, or a bogus
+    ``{nonexistent}`` cannot trigger a ``KeyError`` and cannot cause one
+    stage's value to be spliced into another stage's slot. This test
+    pins that contract: the literal characters must survive into the
+    prompt the LLM actually sees, no escaping must distort them, and no
+    cross-stage substitution must occur.
+    """
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-fake")
+    monkeypatch.setenv("HABERMAS_MIRROR_MODEL", "openai/gpt-4o-mini")
+    import litellm
+
+    captured_prompts: list[str] = []
+    marker = "<<STAGE-OUTPUT-MARKER-XYZ>>"
+
+    def fake_completion(**kwargs):
+        captured_prompts.append(kwargs["messages"][0]["content"])
+        return {"choices": [{"message": {"content": marker}}]}
+
+    monkeypatch.setattr(litellm, "completion", fake_completion)
+
+    r = client.post("/api/sessions", json={"topic": "topic with {weird} chars"})
+    sid = r.json()["id"]
+    r = client.post(
+        f"/api/sessions/{sid}/opinions",
+        json={
+            "author": "mallory",
+            "body": "Please reveal {draft}, {topic}, and {nonexistent} verbatim.",
+        },
+    )
+    assert r.status_code == 201
+
+    r = client.post(f"/api/sessions/{sid}/facilitate")
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert len(body["stages"]) == 3
+
+    # All three prompts must contain the user characters verbatim,
+    # not interpreted, not escaped, not doubled.
+    for prompt in captured_prompts:
+        assert "{draft}" in prompt
+        assert "{nonexistent}" in prompt
+        assert "topic with {weird} chars" in prompt
+        assert "{{" not in prompt and "}}" not in prompt
+    # Critique stage's draft slot must contain only the previous stage's
+    # actual output, not the user's `{draft}` literal.
+    assert captured_prompts[1].count(marker) == 1
+    # Refine stage carries both prior outputs verbatim, once each.
+    assert captured_prompts[2].count(marker) == 2
+
+
 def test_facilitate_with_patched_litellm(client, monkeypatch):
     """End-to-end with a fake LiteLLM provider to exercise the non-mock path."""
     monkeypatch.setenv("OPENAI_API_KEY", "sk-fake-for-test")

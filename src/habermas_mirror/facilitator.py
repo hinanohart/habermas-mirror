@@ -60,6 +60,12 @@ def _gather_opinions(session_id: str) -> tuple[str, list[tuple[str, str]]]:
 
 
 def _format_opinions(opinions: list[tuple[str, str]]) -> str:
+    # ``str.format`` only parses placeholders in the template string and
+    # never re-parses substituted values — verified against Python
+    # semantics — so curly braces inside opinion bodies appear verbatim
+    # in the final prompt and cannot cross-substitute another stage's
+    # value. No escaping is needed or wanted here; escaping would alter
+    # what the model actually reads.
     return "\n\n".join(
         f"Participant {i + 1} ({author}):\n{body}" for i, (author, body) in enumerate(opinions)
     )

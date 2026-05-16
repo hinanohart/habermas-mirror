@@ -47,6 +47,19 @@ It is an engineering artifact: a faithful, hackable re-implementation of the
 Google DeepMind, Alphabet, or the authors of the original Science paper. We
 gratefully cite their published work and the [open prompted reference][hm-deepmind].
 
+## Security model
+
+Participant opinions are inlined verbatim into the LLM prompts that drive
+the four-stage pipeline. **Treat every prompt and every model response as
+untrusted user input.** The repository does not attempt jailbreak
+detection, does not sanitize semantic content, and does not filter
+outputs. Operators self-hosting `habermas-mirror` are responsible for
+whatever downstream review or moderation their context requires.
+
+Single-provider operation is structurally a single-party attestation, not
+a consensus mechanism. See [`docs/BFT_NOTE.md`](./docs/BFT_NOTE.md) for
+the honest version.
+
 ## License
 
 [Apache License 2.0](./LICENSE). See `LICENSE` for the full text.
@@ -57,7 +70,7 @@ gratefully cite their published work and the [open prompted reference][hm-deepmi
 |------:|-------|--------|
 | 0 | repo skeleton, license, README | done |
 | 1 | FastAPI app, LiteLLM wrapper, SQLite, opinion endpoint | done |
-| 2 | four-stage facilitator pipeline + prompts | planned |
+| 2 | four-stage facilitator pipeline + prompts | done |
 | 3 | minimal React (Vite) UI | planned |
 | 4 | docs, smoke tests, release artifact | planned |
 
