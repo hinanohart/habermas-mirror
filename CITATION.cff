@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Self-hostable re-implementation of the prompted Habermas Machine (Tessler et al"
+authors:
+  - family-names: "Hart"
+    given-names: "Hinano"
+    alias: "hinanohart"
+type: software
+license: "NOASSERTION"
+repository-code: "https://github.com/hinanohart/habermas-mirror"
+url: "https://github.com/hinanohart/habermas-mirror"
+version: "0.0.1"
+date-released: "2026-05-17"
+keywords:
+  - "ai-alignment"
+  - "apache-2"
+  - "deliberation"
+  - "fastapi"
+  - "habermas-machine"
+  - "litellm"
+  - "llm"
+  - "self-hosted"
+  - "discourse-ethics"
