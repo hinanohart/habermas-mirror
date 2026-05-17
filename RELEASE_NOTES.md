@@ -32,12 +32,15 @@ the typical "submit-opinions-then-facilitate" loop.
   mounts it as a static directory so the same process answers both
   `/api/*` and `/`. Otherwise the API serves alone and the frontend can
   be deployed behind any static host.
-- 26 tests (`pytest`) covering API plumbing, the four-stage pipeline
+- 29 tests (`pytest`) covering API plumbing, the four-stage pipeline
   with both mock and patched-LiteLLM paths (attribute and dict shape),
-  pipeline atomicity (no orphan stage-1 rows on stage-2 failure), the
-  shared `run_id` correlation column, CORS, the static-mount glue when
-  the bundle is present, the `/api/{rest:path}` JSON 404 catch-all,
-  and five release-invariant guards on the README and `pyproject.toml`.
+  pipeline atomicity (no orphan stage-1 rows on stage-2 failure, plus
+  a unit-level check that `db.get_conn` rolls back on exception by
+  contract), the shared `run_id` correlation column, the
+  `_extract_text` `None`-content and unrecognised-shape `ValueError`
+  contracts, CORS, the static-mount glue when the bundle is present,
+  the `/api/{rest:path}` JSON 404 catch-all, and five release-invariant
+  guards on the README and `pyproject.toml`.
 
 ## What this is **not**
 
@@ -75,15 +78,25 @@ project will redirect users there.
 ## Publishing
 
 This is a local-only release draft. When the maintainer is ready to
-tag 0.0.1 publicly:
+tag 0.0.1 publicly, run the bundled operator script:
 
 ```bash
-git tag -a v0.0.1 -m "habermas-mirror 0.0.1"
-git push origin main v0.0.1
-# (GitHub Release UI or `gh release create v0.0.1 -F RELEASE_NOTES.md`)
+scripts/publish.sh --dry-run    # print the intended plan, no side effects
+scripts/publish.sh              # interactive: confirm each step
+scripts/publish.sh --yes        # non-interactive (CI-friendly)
 ```
+
+The script preflights for a clean working tree, branch=main, and an
+authenticated `gh` CLI, then runs `gh repo create` (with an explicit
+public-visibility confirm), `git push -u origin main`,
+`git tag -a v0.0.1`, `git push origin v0.0.1`, and
+`gh release create v0.0.1 -F RELEASE_NOTES.md`. No API token,
+password, or SSH key value is ever held in a script variable; every
+authenticating call goes through `gh` (its own keyring) or `git` (the
+maintainer's existing credentials helper / SSH agent).
 
 The publishing step is intentionally outside the automated build path
 of this repository: it requires the maintainer to authenticate to
-GitHub interactively, and Apache-2.0-licensed code being put under
-someone's name is a deliberate human decision, not an autonomous one.
+GitHub interactively (`gh auth login`, run separately, not inside the
+script), and Apache-2.0-licensed code being put under someone's name
+is a deliberate human decision, not an autonomous one.

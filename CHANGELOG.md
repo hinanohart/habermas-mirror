@@ -110,6 +110,42 @@ asserts the rollback contract; `test_facilitate_handles_litellm_attribute_shape`
 pins the attribute path; `test_unknown_api_path_returns_json_404`
 pins the catch-all. 26/26 pytest pass.
 
+### Post-final-audit polish + publish script (this commit)
+
+A second pre-ship audit (architect + code-reviewer in parallel) raised
+three further items, all closed here:
+
+- `db.get_conn` now declares its atomicity contract explicitly. Previously
+  the `@contextmanager` had `try: yield; commit() finally: close()` —
+  uncommitted writes were discarded by `close()` rather than rolled back.
+  The body now adds `except BaseException: conn.rollback(); raise`, so
+  partial-pipeline failure is by-contract atomic, not by-accident atomic.
+- `llm._extract_text` no longer silently writes the literal string
+  `"None"` into the `statements` table when a provider returns
+  `content=None` (e.g. a tool-only completion). It raises a descriptive
+  `ValueError`. The `except` was also narrowed so a real programming-error
+  `TypeError` from `str(content)` propagates rather than getting silently
+  swallowed by the dict-shape fallback.
+- `.gitignore` now also covers SQLite WAL sibling files (`*.db-wal`,
+  `*.db-shm`, plus the `.sqlite`/`.sqlite3` variants) so the WAL journal
+  the post-audit hardening enabled cannot leak through `git add .`.
+
+Tests added: `test_extract_text_raises_valueerror_on_none_content`,
+`test_extract_text_raises_valueerror_on_unrecognised_shape`,
+`test_get_conn_rolls_back_on_exception`. 29/29 pytest pass.
+
+`scripts/publish.sh` (new) bundles every remaining operator-side ship
+step into one transcripted shell script: working-tree-clean check,
+on-branch=main check, `gh auth status` precheck, `gh repo create` (with
+explicit `--public` confirmation), `git push -u origin main`,
+`git tag -a v0.0.1`, `git push origin v0.0.1`, and
+`gh release create v0.0.1 -F RELEASE_NOTES.md`. Strict-mode bash,
+`--dry-run` and `--yes` flags, and an interactive `[y/N]` gate before
+every destructive step. No API token, password, or SSH key value is
+ever read into a script variable — every authenticating call goes
+through `gh` (its own keyring) or `git` (the user's existing credentials
+helper / SSH agent).
+
 ### Phase 4 — docs, smoke, release artefact
 
 - README Usage section with explicit two-shell setup (uvicorn +

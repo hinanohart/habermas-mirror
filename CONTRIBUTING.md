@@ -37,6 +37,14 @@ npm run dev                  # http://localhost:5173 — proxies /api to backend
 the mechanical guard against the kind of stale-documentation drift the
 project has already had to fix twice; please leave it in place.
 
+### Publishing a new tag
+
+The maintainer-only `scripts/publish.sh` bundles every operator-side
+publish step (gh repo create / push / tag / release). It accepts
+`--dry-run` and `--yes`, preflights for a clean working tree, branch
+`main`, and an authenticated `gh` CLI, and never reads an API token or
+SSH key into a script variable. See the file header for full usage.
+
 ### Running against a real LLM provider
 
 Set `HABERMAS_MIRROR_MODEL` and the matching provider key:

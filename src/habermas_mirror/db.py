@@ -72,11 +72,23 @@ def init_db() -> None:
 
 @contextmanager
 def get_conn() -> Iterator[sqlite3.Connection]:
+    """Connection context manager with explicit commit/rollback contract.
+
+    On normal exit the open transaction is committed. On exception the
+    transaction is explicitly rolled back before the exception is re-raised,
+    so callers (e.g. ``facilitator.facilitate``) can rely on atomicity by
+    contract rather than by accident of ``close()`` discarding uncommitted
+    writes.
+    """
     conn = sqlite3.connect(_db_path())
     conn.row_factory = sqlite3.Row
     _apply_pragmas(conn)
     try:
         yield conn
+    except BaseException:
+        conn.rollback()
+        raise
+    else:
         conn.commit()
     finally:
         conn.close()

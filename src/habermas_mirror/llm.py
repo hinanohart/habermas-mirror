@@ -89,17 +89,22 @@ def _extract_text(resp: object) -> str:
     the canonical path. Try attribute access first and fall back to
     subscripting so we work against both shapes without depending on
     the exact LiteLLM version pinned in the venv.
+
+    A ``None`` ``content`` (e.g. a provider returning a tool-call only
+    completion) raises ``ValueError`` rather than silently writing the
+    literal string ``"None"`` into the database.
     """
+    content: object
     try:
-        choice = resp.choices[0]  # type: ignore[attr-defined]
-        message = choice.message
-        content = message.content
-        if content is None:
-            raise AttributeError
-        return str(content)
-    except (AttributeError, IndexError, TypeError):
-        pass
-    return str(resp["choices"][0]["message"]["content"])  # type: ignore[index]
+        content = resp.choices[0].message.content  # type: ignore[attr-defined]
+    except (AttributeError, IndexError):
+        try:
+            content = resp["choices"][0]["message"]["content"]  # type: ignore[index]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise ValueError("LiteLLM response has no recognisable content shape") from exc
+    if content is None:
+        raise ValueError("LiteLLM response content is None")
+    return str(content)
 
 
 def _mock_completion(prompt: str) -> str:

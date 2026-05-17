@@ -237,6 +237,61 @@ def test_facilitate_user_curly_braces_appear_verbatim(client, monkeypatch):
     assert captured_prompts[2].count(marker) == 2
 
 
+def test_extract_text_raises_valueerror_on_none_content():
+    """LiteLLM may return ``content=None`` for tool-only completions.
+
+    The post-final-audit contract is to raise ``ValueError`` rather than
+    silently write the literal string ``"None"`` into the database via
+    ``str(None)``.
+    """
+    from types import SimpleNamespace
+
+    from habermas_mirror.llm import _extract_text
+
+    resp = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=None))])
+    with pytest.raises(ValueError, match="content is None"):
+        _extract_text(resp)
+
+
+def test_extract_text_raises_valueerror_on_unrecognised_shape():
+    """An object that matches neither attribute nor dict shape must surface
+    a descriptive ``ValueError`` rather than an opaque TypeError or
+    AttributeError."""
+    from habermas_mirror.llm import _extract_text
+
+    with pytest.raises(ValueError, match="recognisable content shape"):
+        _extract_text(object())
+
+
+def test_get_conn_rolls_back_on_exception(tmp_path, monkeypatch):
+    """``get_conn`` must rollback uncommitted writes when its body raises.
+
+    Prior behaviour relied on close-without-commit semantics (writes were
+    discarded, but only because no ``commit`` ever ran). The post-final-
+    audit contract makes the rollback explicit so callers can rely on
+    atomicity by contract rather than by accident.
+    """
+    import importlib
+
+    monkeypatch.setenv("HABERMAS_MIRROR_DB", str(tmp_path / "rollback.db"))
+    from habermas_mirror import db as db_mod
+
+    importlib.reload(db_mod)
+    db_mod.init_db()
+
+    with pytest.raises(RuntimeError, match="explode"):
+        with db_mod.get_conn() as conn:
+            conn.execute(
+                "INSERT INTO sessions (id, topic, created_at) VALUES (?, ?, ?)",
+                ("abc", "doomed", "2026-05-17T00:00:00Z"),
+            )
+            raise RuntimeError("explode")
+
+    with db_mod.get_conn() as conn:
+        rows = conn.execute("SELECT COUNT(*) AS n FROM sessions").fetchone()
+        assert rows["n"] == 0
+
+
 def test_facilitate_with_patched_litellm(client, monkeypatch):
     """End-to-end with a fake LiteLLM provider to exercise the non-mock path."""
     monkeypatch.setenv("OPENAI_API_KEY", "sk-fake-for-test")
