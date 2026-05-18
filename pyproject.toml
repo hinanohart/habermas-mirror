@@ -8,7 +8,7 @@ version = "0.0.1"
 description = "Self-hostable reference re-implementation of the prompted Habermas Machine deliberation facilitator (Tessler et al., Science 2024)."
 readme = "README.md"
 requires-python = ">=3.12"
-license = "Apache-2.0"
+license = "MIT"
 license-files = ["LICENSE"]
 authors = [
   { name = "habermas-mirror contributors" },
