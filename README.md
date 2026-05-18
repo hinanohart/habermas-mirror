@@ -21,7 +21,7 @@ researchers a:
 - self-hostable
 - LLM-provider-agnostic (via [LiteLLM][litellm])
 - minimal-dependency
-- Apache-2.0-licensed
+- MIT-licensed
 
 reference implementation of the four-stage deliberation pipeline
 (*gather opinions → draft group statement → critique → refine*), so the
@@ -65,7 +65,7 @@ the honest version.
 
 ## License
 
-[Apache License 2.0](./LICENSE). See `LICENSE` for the full text.
+[MIT License](./LICENSE). See `LICENSE` for the full text.
 
 ## Usage
 
